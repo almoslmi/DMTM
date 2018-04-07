@@ -10,6 +10,7 @@ import string
 import math
 import nltk
 #nltk.download('popular')
+import scipy.sparse as sp
 from nltk.corpus import treebank
 from nltk.corpus import stopwords
 from nltk.parse.corenlp import CoreNLPParser
@@ -43,30 +44,29 @@ train_df['tok_wo_stop'] = train_df['tokens'].apply(lambda val : [x for x in val 
 #train_df['tagged'] = train_df['tok_wo_stop'].apply(nltk.pos_tag) #taking too much time, think of better way if possible
 
 # Bag of Words
-token_list = [" ".join(x) for x in train_df['tok_wo_stop']]
+train_df['token_list'] = train_df['tok_wo_stop'].apply(lambda x : " ".join(x))
 
 
-# In[15]:
+# In[40]:
 
-
-# splitting data into training and test set
-train_end = math.floor(0.8*len(token_list))
-train_token_list = token_list[ : train_end]
-test_token_list = token_list[train_end : ]
 
 # converting text to features
 vectorizer = CountVectorizer(analyzer = "word",
                             tokenizer = None,
                             preprocessor = None,
                             stop_words = None,
-                            max_features = 1530)
-train_features = vectorizer.fit_transform(train_token_list) #no aspect taken into account yet!
-train_features = train_features.toarray()
-test_features = vectorizer.fit_transform(test_token_list)
-test_features = test_features.toarray()
+                            min_df = 2)
+sample = train_df[['token_list', 'aspect_term']]
+features = sp.hstack(sample.apply(lambda col: vectorizer.fit_transform(col))) #no polarity of aspect taken into account yet!
+features = features.toarray()
+
+# splitting features into training and test feature set (90:10)
+train_end = math.floor(0.9*(train_df['token_list'].size))
+train_features = features[:train_end]
+test_features = features[train_end:]
 
 
-# In[16]:
+# In[41]:
 
 
 forest = RandomForestClassifier(n_estimators = 100)
@@ -74,7 +74,7 @@ forest = RandomForestClassifier(n_estimators = 100)
 forest = forest.fit(train_features, train_df.loc[ : train_end - 1 , 'class'])
 
 
-# In[17]:
+# In[42]:
 
 
 result = forest.predict(test_features)
